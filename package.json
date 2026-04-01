@@ -1,0 +1,31 @@
+{
+  "name": "invision-backend",
+  "version": "1.0.0",
+  "description": "Backend for Invision university application system",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "keywords": [],
+  "author": "Yerayal team",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "@fastify/helmet": "^13.0.2",
+    "@fastify/jwt": "^10.0.0",
+    "@fastify/mongodb": "^10.0.0",
+    "@fastify/rate-limit": "^10.3.0",
+    "@sinclair/typebox": "^0.34.49",
+    "bcryptjs": "^3.0.3",
+    "fastify": "^5.8.4"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "nodemon": "^3.1.14",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.2"
+  }
+}
