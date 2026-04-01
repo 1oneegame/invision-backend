@@ -12,10 +12,15 @@ import type {
     User,
     UserCreateBody,
     UserParams,
+    UserRole,
     UserUpdateBody,
 } from '../../schemas/user.schema.js';
 
-function toResponseUser(user: User & { _id: ObjectId }) {
+const AuthErrorSchema = UserMutationResponseSchema;
+
+type UserDocument = User & { _id: ObjectId };
+
+function toResponseUser(user: UserDocument) {
     return {
         ...user,
         _id: user._id.toHexString(),
@@ -33,9 +38,12 @@ export default async function usersRoutes(fastify: FastifyInstance) {
     const collection = db.collection<User>('users');
 
     fastify.get('/', {
+        preHandler: fastify.authorizeRoles(['Admin']),
         schema: {
             response: {
                 200: UserListResponseSchema,
+                401: AuthErrorSchema,
+                403: AuthErrorSchema,
             },
         },
     }, async () => {
@@ -48,17 +56,25 @@ export default async function usersRoutes(fastify: FastifyInstance) {
             body: UserCreateBodySchema,
             response: {
                 201: UserDocumentSchema,
+                401: AuthErrorSchema,
+                403: AuthErrorSchema,
             },
         },
     }, async (request, reply) => {
-        const newUser = {
+        const requesterRole = request.user.role;
+        if (requesterRole !== 'Admin' && requesterRole !== 'Applicant') {
+            return reply.code(403).send({ message: 'Forbidden' });
+        }
+
+        const newUser: User = {
             name: request.body.name.trim(),
-            surname: request.body.surname ? request.body.surname.trim() : undefined,
             email: request.body.email.trim().toLowerCase(),
             ...(typeof request.body.age !== 'undefined' ? { age: request.body.age } : {}),
+            ...(typeof request.body.surname !== 'undefined' ? { surname: request.body.surname.trim() } : {}),
+            role: 'Applicant' as UserRole,
         };
 
-        const result = await collection.insertOne(newUser as any);
+        const result = await collection.insertOne(newUser);
         const createdUser = await collection.findOne({ _id: result.insertedId });
 
         if (!createdUser) {
@@ -69,12 +85,15 @@ export default async function usersRoutes(fastify: FastifyInstance) {
     });
 
     fastify.patch<{ Params: UserParams; Body: UserUpdateBody }>('/:id', {
+        preHandler: fastify.authorizeRoles(['Admin']),
         schema: {
             params: UserParamsSchema,
             body: UserUpdateBodySchema,
             response: {
                 200: UserDocumentSchema,
                 400: UserMutationResponseSchema,
+                401: AuthErrorSchema,
+                403: AuthErrorSchema,
                 404: UserMutationResponseSchema,
             },
         },
@@ -85,7 +104,9 @@ export default async function usersRoutes(fastify: FastifyInstance) {
         } catch {
             return reply.code(400).send({ message: 'Invalid user id' });
         }
-        const updatePayload: any = { ...request.body };
+        const updatePayload: Partial<User> = { ...request.body };
+        // Role cannot be changed from API routes.
+        delete updatePayload.role;
         if (typeof updatePayload.name === 'string') updatePayload.name = updatePayload.name.trim();
         if (typeof updatePayload.surname === 'string') updatePayload.surname = updatePayload.surname.trim();
         if (typeof updatePayload.email === 'string') updatePayload.email = updatePayload.email.trim().toLowerCase();
@@ -100,15 +121,18 @@ export default async function usersRoutes(fastify: FastifyInstance) {
             return reply.code(404).send({ message: 'User not found' });
         }
 
-        return toResponseUser(result as any);
+        return toResponseUser(result);
     });
 
     fastify.delete<{ Params: UserParams }>('/:id', {
+        preHandler: fastify.authorizeRoles(['Admin']),
         schema: {
             params: UserParamsSchema,
             response: {
                 200: UserMutationResponseSchema,
                 400: UserMutationResponseSchema,
+                401: AuthErrorSchema,
+                403: AuthErrorSchema,
                 404: UserMutationResponseSchema,
             },
         },

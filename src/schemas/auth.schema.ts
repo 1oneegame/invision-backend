@@ -1,6 +1,11 @@
 import { Type } from '@sinclair/typebox';
 import type { Static } from '@sinclair/typebox';
 
+export const UserRoleSchema = Type.Union([
+    Type.Literal('Admin'),
+    Type.Literal('Applicant'),
+]);
+
 export const ErrorResponseSchema = Type.Object({
     message: Type.String(),
     code: Type.Optional(Type.Union([
@@ -19,6 +24,7 @@ export const SignupBodySchema = Type.Object({
     email: Type.String({ format: 'email', maxLength: 320 }),
     phone: Type.String({ minLength: 7, maxLength: 20, pattern: '^\\+?[0-9]{7,20}$' }),
     password: Type.String({ minLength: 8, maxLength: 72 }),
+    role: Type.Optional(UserRoleSchema),
 });
 
 export const SigninBodySchema = Type.Object({
@@ -32,6 +38,7 @@ export const AuthUserSchema = Type.Object({
     surname: Type.Optional(Type.String()),
     email: Type.String({ format: 'email' }),
     phone: Type.String(),
+    role: UserRoleSchema,
 });
 
 export const SignupResponseSchema = Type.Object({
@@ -47,3 +54,4 @@ export type ErrorResponse = Static<typeof ErrorResponseSchema>;
 export type SignupBody = Static<typeof SignupBodySchema>;
 export type SigninBody = Static<typeof SigninBodySchema>;
 export type AuthUser = Static<typeof AuthUserSchema>;
+export type UserRole = Static<typeof UserRoleSchema>;

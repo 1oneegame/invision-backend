@@ -1,12 +1,14 @@
 import bcrypt from 'bcryptjs';
 import type { Collection, ObjectId } from 'mongodb';
 import { MongoServerError } from 'mongodb';
+import type { UserRole } from '../schemas/auth.schema.js';
 
 export type AuthErrorCode = 'invalid_credentials' | 'email_exists' | 'validation' | 'unknown';
 
 type JwtPayload = {
     sub: string;
     email: string;
+    role: UserRole;
 };
 
 type SignJwt = (payload: JwtPayload) => string;
@@ -31,6 +33,7 @@ export type AuthUserDocument = {
     email: string;
     phone: string;
     passwordHash: string;
+    role: UserRole;
     createdAt: Date;
     updatedAt: Date;
 };
@@ -41,6 +44,7 @@ export type AuthUserDto = {
     surname?: string | undefined;
     email: string;
     phone: string;
+    role: UserRole;
 };
 
 export class AuthServiceError extends Error {
@@ -63,12 +67,14 @@ function normalizePhone(phone: string): string {
 }
 
 function toAuthUserDto(user: AuthUserDocument & { _id: ObjectId }): AuthUserDto {
+    const role = user.role ?? 'Applicant';
     return {
         id: user._id.toHexString(),
         name: user.name,
         surname: user.surname,
         email: user.email,
         phone: user.phone,
+        role,
     };
 }
 
@@ -90,6 +96,7 @@ export function createAuthService(
                     email,
                     phone,
                     passwordHash,
+                    role: 'Applicant',
                     createdAt: now,
                     updatedAt: now,
                 });
@@ -127,9 +134,19 @@ export function createAuthService(
                 throw new AuthServiceError('Invalid email or password', 401, 'invalid_credentials');
             }
 
+            const effectiveRole = user.role ?? 'Applicant';
+
+            if (!user.role) {
+                await usersCollection.updateOne(
+                    { _id: user._id },
+                    { $set: { role: effectiveRole, updatedAt: new Date() } },
+                );
+            }
+
             const accessToken = signJwt({
                 sub: user._id.toHexString(),
                 email: user.email,
+                role: effectiveRole,
             });
 
             return {

@@ -14,6 +14,8 @@ import fastifyJwt from '@fastify/jwt';
 import rateLimit from '@fastify/rate-limit';
 import authRoutes from './routes/auth/auth.route.js';
 import { AuthServiceError } from './services/auth.service.js';
+import intakeRoutes from './routes/candidates/intake.route.js';
+import type { UserRole } from './schemas/user.schema.js';
 
 const PORT = process.env.PORT || 3000;
 
@@ -80,9 +82,20 @@ fastify.register(fastifyJwt, {
 fastify.decorate('authenticate', async (request: FastifyRequest, reply: FastifyReply) => {
   try {
     await request.jwtVerify();
+    if (request.user.role !== 'Admin' && request.user.role !== 'Applicant') {
+      return reply.code(403).send({ message: 'Forbidden' });
+    }
   } catch (error) {
-  reply.code(401).send({ message: 'Unauthorized' });
+    return reply.code(401).send({ message: 'Unauthorized' });
   }
+});
+
+fastify.decorate('authorizeRoles', (roles: UserRole[]) => {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!roles.includes(request.user.role)) {
+      return reply.code(403).send({ message: 'Forbidden' });
+    }
+  };
 });
 
 fastify.setErrorHandler((error: FastifyError & { validation?: ValidationIssue[] }, request, reply) => {
@@ -109,6 +122,7 @@ fastify.setErrorHandler((error: FastifyError & { validation?: ValidationIssue[] 
 /* --------------------------------- Routes --------------------------------- */
 fastify.register(usersRoutes, { prefix: '/users' });
 fastify.register(authRoutes, { prefix: '/auth' });
+fastify.register(intakeRoutes, { prefix: '/candidates' });
 
 
 fastify.get('/', async (request, reply) => {
