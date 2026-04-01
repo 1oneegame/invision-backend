@@ -4,7 +4,7 @@
   "description": "Backend for Invision university application system",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/index.ts",
+    "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js"
   },
@@ -20,12 +20,14 @@
     "@fastify/rate-limit": "^10.3.0",
     "@sinclair/typebox": "^0.34.49",
     "bcryptjs": "^3.0.3",
+    "dotenv": "^17.3.1",
     "fastify": "^5.8.4"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
     "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "typescript": "^6.0.2"
   }
 }

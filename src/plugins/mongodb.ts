@@ -9,7 +9,7 @@ const mongodbPlugin: FastifyPluginAsync = async (fastify) => {
         throw new Error('MONGODB_URI is required');
     }
 
-    fastify.register(mongodb, {
+    await fastify.register(mongodb, {
         url: mongoUri,
         forceClose: true,
     });

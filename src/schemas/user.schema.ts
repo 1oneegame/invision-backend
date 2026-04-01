@@ -2,7 +2,8 @@ import { Type } from "@sinclair/typebox";
 import type { Static } from "@sinclair/typebox";
 
 export const UserSchema = Type.Object({
-    name: Type.String(),
+    name: Type.String({ minLength: 1, maxLength: 120 }),
+    surname: Type.Optional(Type.String({ minLength: 1, maxLength: 120 })),
     email: Type.String({ format: 'email' }),
     age: Type.Optional(Type.Number({ minimum: 0 })),
 });
@@ -20,6 +21,7 @@ export const UserParamsSchema = Type.Object({
 export const UserDocumentSchema = Type.Object({
     _id: Type.String(),
     name: Type.String(),
+    surname: Type.Optional(Type.String()),
     email: Type.String({ format: 'email' }),
     age: Type.Optional(Type.Number({ minimum: 0 })),
 });

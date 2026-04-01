@@ -51,7 +51,14 @@ export default async function usersRoutes(fastify: FastifyInstance) {
             },
         },
     }, async (request, reply) => {
-        const result = await collection.insertOne(request.body);
+        const newUser = {
+            name: request.body.name.trim(),
+            surname: request.body.surname ? request.body.surname.trim() : undefined,
+            email: request.body.email.trim().toLowerCase(),
+            ...(typeof request.body.age !== 'undefined' ? { age: request.body.age } : {}),
+        };
+
+        const result = await collection.insertOne(newUser as any);
         const createdUser = await collection.findOne({ _id: result.insertedId });
 
         if (!createdUser) {
@@ -78,10 +85,14 @@ export default async function usersRoutes(fastify: FastifyInstance) {
         } catch {
             return reply.code(400).send({ message: 'Invalid user id' });
         }
+        const updatePayload: any = { ...request.body };
+        if (typeof updatePayload.name === 'string') updatePayload.name = updatePayload.name.trim();
+        if (typeof updatePayload.surname === 'string') updatePayload.surname = updatePayload.surname.trim();
+        if (typeof updatePayload.email === 'string') updatePayload.email = updatePayload.email.trim().toLowerCase();
 
         const result = await collection.findOneAndUpdate(
             { _id: objectId },
-            { $set: request.body },
+            { $set: updatePayload },
             { returnDocument: 'after' },
         );
 
@@ -89,7 +100,7 @@ export default async function usersRoutes(fastify: FastifyInstance) {
             return reply.code(404).send({ message: 'User not found' });
         }
 
-        return toResponseUser(result);
+        return toResponseUser(result as any);
     });
 
     fastify.delete<{ Params: UserParams }>('/:id', {

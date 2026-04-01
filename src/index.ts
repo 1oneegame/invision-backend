@@ -1,3 +1,5 @@
+import 'dotenv/config';
+
 import Fastify, {
   type FastifyError,
   type FastifyInstance,
@@ -22,6 +24,37 @@ if (!jwtSecret) {
 
 const corsOrigin = process.env.CORS_ORIGIN?.split(',').map((origin) => origin.trim()).filter(Boolean)
   ?? ['http://localhost:3000'];
+
+type ValidationIssue = {
+  instancePath?: string;
+  message?: string;
+};
+
+function buildFieldErrors(issues: ValidationIssue[] | undefined): Record<string, string[]> | undefined {
+  if (!issues || issues.length === 0) {
+    return undefined;
+  }
+
+  const fieldErrors: Record<string, string[]> = {};
+
+  for (const issue of issues) {
+    const path = issue.instancePath?.split('/').filter(Boolean) ?? [];
+    const field = path[path.length - 1] ?? 'body';
+    const message = issue.message?.trim();
+
+    if (!message) {
+      continue;
+    }
+
+    if (!fieldErrors[field]) {
+      fieldErrors[field] = [];
+    }
+
+    fieldErrors[field].push(message);
+  }
+
+  return Object.keys(fieldErrors).length > 0 ? fieldErrors : undefined;
+}
 
 const fastify : FastifyInstance = Fastify({
     logger: true,
@@ -52,14 +85,18 @@ fastify.decorate('authenticate', async (request: FastifyRequest, reply: FastifyR
   }
 });
 
-fastify.setErrorHandler((error: FastifyError & { validation?: unknown }, request, reply) => {
+fastify.setErrorHandler((error: FastifyError & { validation?: ValidationIssue[] }, request, reply) => {
   if (error.validation) {
     request.log.warn({ error }, 'Validation failed');
-    return reply.code(400).send({ message: 'Invalid request payload' });
+    return reply.code(400).send({
+      message: 'Invalid request payload',
+      code: 'validation',
+      fieldErrors: buildFieldErrors(error.validation),
+    });
   }
 
   if (error instanceof AuthServiceError) {
-    return reply.code(error.statusCode).send({ message: error.message });
+    return reply.code(error.statusCode).send({ message: error.message, code: error.code });
   }
 
   const statusCode = typeof error.statusCode === 'number' ? error.statusCode : 500;
