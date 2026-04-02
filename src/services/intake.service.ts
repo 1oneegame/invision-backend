@@ -3,6 +3,7 @@ import type {
     IntakeBody,
     IntakeResponse,
     IntakeStatusResponse,
+    MyIntakeResponse,
 } from '../schemas/intake.schema.js';
 
 export type IntakeDocument = IntakeBody & {
@@ -203,6 +204,24 @@ export function createIntakeService(
             }
 
             return toDto(updated as IntakeDocument & { _id: ObjectId });
+        },
+
+        async getMyIntake(userId: string): Promise<MyIntakeResponse | null> {
+            const doc = await intakeCollection.findOne({ userId });
+            if (!doc || !doc._id) {
+                return null;
+            }
+
+            return {
+                candidateId: doc._id.toHexString(),
+                status: doc.status,
+                completeness: doc.completeness,
+                profile: doc.profile,
+                ...(doc.essay ? { essay: doc.essay } : {}),
+                ...(doc.video ? { video: doc.video } : {}),
+                consent: doc.consent,
+                ...(doc.socialImpact ? { socialImpact: doc.socialImpact } : {}),
+            };
         },
 
         async getStatus(candidateId: string, userId: string, isAdmin: boolean): Promise<IntakeStatusResponse> {

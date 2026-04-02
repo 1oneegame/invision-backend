@@ -27,6 +27,21 @@ export const IntakeVideoSchema = Type.Object({
     metadata: Type.Optional(Type.Record(Type.String(), Type.String())),
 });
 
+export const IntakeSocialImpactProjectSchema = Type.Object({
+    id: Type.Optional(Type.String()),
+    name: Type.Optional(Type.String({ maxLength: 200 })),
+    role: Type.Optional(Type.String({ maxLength: 200 })),
+    year: Type.Optional(Type.String({ maxLength: 10 })),
+    description: Type.Optional(Type.String({ maxLength: 1000 })),
+    impact: Type.Optional(Type.String({ maxLength: 500 })),
+});
+
+export const IntakeSocialImpactSchema = Type.Object({
+    projects: Type.Optional(Type.Array(IntakeSocialImpactProjectSchema, { maxItems: 20 })),
+    leadershipExample: Type.Optional(Type.String({ maxLength: 2000 })),
+    teamworkExample: Type.Optional(Type.String({ maxLength: 2000 })),
+});
+
 export const IntakeConsentSchema = Type.Object({
     dataProcessing: Type.Boolean(),
     aiAnalysis: Type.Boolean(),
@@ -38,6 +53,18 @@ export const IntakeBodySchema = Type.Object({
     essay: Type.Optional(IntakeEssaySchema),
     video: Type.Optional(IntakeVideoSchema),
     consent: IntakeConsentSchema,
+    socialImpact: Type.Optional(IntakeSocialImpactSchema),
+});
+
+export const MyIntakeResponseSchema = Type.Object({
+    candidateId: Type.String(),
+    status: Type.Union([Type.Literal('draft'), Type.Literal('submitted')]),
+    completeness: Type.Number({ minimum: 0, maximum: 100 }),
+    profile: IntakeProfileSchema,
+    essay: Type.Optional(IntakeEssaySchema),
+    video: Type.Optional(IntakeVideoSchema),
+    consent: IntakeConsentSchema,
+    socialImpact: Type.Optional(IntakeSocialImpactSchema),
 });
 
 export const IntakeStatusSchema = Type.Union([
@@ -73,6 +100,7 @@ export type IntakeEssay = Static<typeof IntakeEssaySchema>;
 export type IntakeVideo = Static<typeof IntakeVideoSchema>;
 export type IntakeConsent = Static<typeof IntakeConsentSchema>;
 export type IntakeStatus = Static<typeof IntakeStatusSchema>;
+export type MyIntakeResponse = Static<typeof MyIntakeResponseSchema>;
 export type IntakeResponse = Static<typeof IntakeResponseSchema>;
 export type IntakeStatusResponse = Static<typeof IntakeStatusResponseSchema>;
 export type CandidateParams = Static<typeof CandidateParamsSchema>;

@@ -119,6 +119,12 @@ export type ExplanationReasons = {
     factorsMinus: string[];
 };
 
+export type AiDetectionResult = {
+    score: number;
+    label: 'likely-ai' | 'likely-human' | 'uncertain';
+    notes: string;
+};
+
 export type CandidateExplanationResult = {
     candidateId: string;
     reasons: ExplanationReasons;
@@ -127,6 +133,7 @@ export type CandidateExplanationResult = {
     counterFactuals: string[];
     requiresManualReview: boolean;
     modelLimitations: string;
+    aiDetection?: AiDetectionResult;
     metadata: {
         track: Track;
         scoringVersion: string;

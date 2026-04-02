@@ -111,6 +111,16 @@ export const ListScoringResponseSchema = Type.Object({
     cohortId: Type.Optional(Type.String({ minLength: 1 })),
 });
 
+export const AiDetectionSchema = Type.Object({
+    score: Type.Number({ minimum: 0, maximum: 1 }),
+    label: Type.Union([
+        Type.Literal('likely-ai'),
+        Type.Literal('likely-human'),
+        Type.Literal('uncertain'),
+    ]),
+    notes: Type.String(),
+});
+
 export const CandidateExplanationQuerySchema = Type.Object({
     language: Type.Optional(ExplainabilityLanguageSchema),
 });
@@ -135,6 +145,7 @@ export const CandidateExplanationResponseSchema = Type.Object({
     counterFactuals: Type.Array(Type.String()),
     requiresManualReview: Type.Boolean(),
     modelLimitations: Type.String({ minLength: 1 }),
+    aiDetection: Type.Optional(AiDetectionSchema),
     metadata: Type.Object({
         track: TrackSchema,
         scoringVersion: Type.String({ minLength: 1 }),

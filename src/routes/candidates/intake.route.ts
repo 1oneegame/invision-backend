@@ -5,6 +5,7 @@ import {
     IntakeErrorSchema,
     IntakeResponseSchema,
     IntakeStatusResponseSchema,
+    MyIntakeResponseSchema,
 } from '../../schemas/intake.schema.js';
 import type { CandidateParams, IntakeBody } from '../../schemas/intake.schema.js';
 import {
@@ -79,6 +80,22 @@ const intakeRoutes: FastifyPluginAsync = async (fastify) => {
     );
 
     fastify.addHook('preHandler', fastify.authenticate);
+
+    fastify.get('/intake', {
+        schema: {
+            response: {
+                200: MyIntakeResponseSchema,
+                401: IntakeErrorSchema,
+                404: IntakeErrorSchema,
+            },
+        },
+    }, async (request, reply) => {
+        const result = await intakeService.getMyIntake(request.user.sub);
+        if (!result) {
+            return reply.code(404).send({ message: 'No intake found' });
+        }
+        return reply.code(200).send(result);
+    });
 
     fastify.post<{ Body: IntakeBody }>('/intake', {
         schema: {
