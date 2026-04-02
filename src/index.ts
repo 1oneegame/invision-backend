@@ -15,6 +15,7 @@ import rateLimit from '@fastify/rate-limit';
 import authRoutes from './routes/auth/auth.route.js';
 import { AuthServiceError } from './services/auth.service.js';
 import intakeRoutes from './routes/candidates/intake.route.js';
+import scoringRoutes from './routes/scoring/scoring.route.js';
 import type { UserRole } from './schemas/user.schema.js';
 
 const PORT = process.env.PORT || 3000;
@@ -123,6 +124,7 @@ fastify.setErrorHandler((error: FastifyError & { validation?: ValidationIssue[] 
 fastify.register(usersRoutes, { prefix: '/users' });
 fastify.register(authRoutes, { prefix: '/auth' });
 fastify.register(intakeRoutes, { prefix: '/candidates' });
+fastify.register(scoringRoutes, { prefix: '/scoring' });
 
 
 fastify.get('/', async (request, reply) => {
