@@ -8,6 +8,8 @@ import type {
     BatchScoringFailureItem,
     BatchScoringInput,
     BatchScoringResultItem,
+    CandidateExplanationResult,
+    ExplainabilityLanguage,
     FeatureVector,
     ListScoringInput,
     ListScoringResult,
@@ -101,6 +103,49 @@ const AI_ANALYSIS_SCHEMA = z.object({
     factorsMinus: z.array(z.string()).max(5),
     notes: z.string(),
 });
+
+const DEFAULT_EXPLANATION_LANGUAGE: ExplainabilityLanguage = 'ru';
+
+const LIMITATIONS_TEXT: Record<ExplainabilityLanguage, string> = {
+    ru: 'Это AI-assisted оценка, не автономное решение. Рекомендуется обязательная проверка комиссией, особенно для пограничных кейсов.',
+    eng: 'This is an AI-assisted assessment, not an autonomous decision. Committee review remains mandatory, especially for borderline cases.',
+    kz: 'Бул AI-assisted багалау, автономды шешім емес. Әсіресе шекаралық жағдайларда комиссияның міндетті тексеруі қажет.',
+};
+
+const FACTOR_TRANSLATIONS: Record<string, { ru: string; kz: string }> = {
+    'Profile data is complete and well-structured.': {
+        ru: 'Профиль заполнен полно и структурированно.',
+        kz: 'Профиль толық әрі құрылымды толтырылған.',
+    },
+    'Essay length provides enough context for assessment.': {
+        ru: 'Объем эссе дает достаточно контекста для оценки.',
+        kz: 'Эссе көлемі бағалауға жеткілікті контекст береді.',
+    },
+    'Essay shows leadership-oriented language and examples.': {
+        ru: 'В эссе есть лидерские формулировки и примеры.',
+        kz: 'Эсседе көшбасшылыққа қатысты тұжырымдар мен мысалдар бар.',
+    },
+    'Version history suggests measurable growth over time.': {
+        ru: 'История версий показывает измеримый прогресс со временем.',
+        kz: 'Нұсқалар тарихы уақыт өте өлшенетін өсімді көрсетеді.',
+    },
+    'Essay is short; signal quality is limited.': {
+        ru: 'Эссе слишком короткое, поэтому качество сигналов ограничено.',
+        kz: 'Эссе қысқа, сондықтан сигнал сапасы шектеулі.',
+    },
+    'Profile completeness is below target level.': {
+        ru: 'Полнота профиля ниже целевого уровня.',
+        kz: 'Профильдің толықтығы мақсатты деңгейден төмен.',
+    },
+    'Engagement signals are weaker than expected.': {
+        ru: 'Сигналы вовлеченности ниже ожидаемого уровня.',
+        kz: 'Қатысу сигналдары күткен деңгейден төмен.',
+    },
+    'AI analysis consent is missing; NLP enhancement disabled.': {
+        ru: 'Нет согласия на AI-анализ, NLP-улучшение отключено.',
+        kz: 'AI талдауға келісім жоқ, NLP жақсартуы өшірілген.',
+    },
+};
 
 function clampScore(value: number): number {
     return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
@@ -231,6 +276,143 @@ function buildBaselineExplanation(features: FeatureVector): ScoringExplanation {
         factorsMinus: dedupeFactors(factorsMinus),
         notes: 'Baseline scoring combines profile completeness, essay quality, growth, and engagement signals.',
     };
+}
+
+function normalizeExplanationLanguage(language?: ExplainabilityLanguage): ExplainabilityLanguage {
+    if (language === 'eng' || language === 'kz' || language === 'ru') {
+        return language;
+    }
+
+    return DEFAULT_EXPLANATION_LANGUAGE;
+}
+
+function translateFactor(text: string, language: ExplainabilityLanguage): string {
+    if (language === 'eng') {
+        return text;
+    }
+
+    const translation = FACTOR_TRANSLATIONS[text];
+    if (!translation) {
+        return text;
+    }
+
+    return language === 'ru' ? translation.ru : translation.kz;
+}
+
+function translateFactors(items: string[], language: ExplainabilityLanguage): string[] {
+    return items.map((item) => translateFactor(item, language));
+}
+
+function topFactors(items: string[], limit: number): string[] {
+    return dedupeFactors(items).slice(0, limit);
+}
+
+function scoreContributionPercentages(subscores: Subscores, track: Track): {
+    motivationPercent: number;
+    leadershipPercent: number;
+    growthPercent: number;
+    readinessPercent: number;
+} {
+    const weights = TRACK_WEIGHTS[track];
+    const motivationRaw = subscores.motivation * weights.motivation;
+    const leadershipRaw = subscores.leadership * weights.leadership;
+    const growthRaw = subscores.growth * weights.growth;
+    const readinessRaw = subscores.readiness * weights.readiness;
+    const totalRaw = motivationRaw + leadershipRaw + growthRaw + readinessRaw;
+
+    if (totalRaw <= 0) {
+        return {
+            motivationPercent: 0,
+            leadershipPercent: 0,
+            growthPercent: 0,
+            readinessPercent: 0,
+        };
+    }
+
+    return {
+        motivationPercent: Number(((motivationRaw / totalRaw) * 100).toFixed(2)),
+        leadershipPercent: Number(((leadershipRaw / totalRaw) * 100).toFixed(2)),
+        growthPercent: Number(((growthRaw / totalRaw) * 100).toFixed(2)),
+        readinessPercent: Number(((readinessRaw / totalRaw) * 100).toFixed(2)),
+    };
+}
+
+function buildCounterfactuals(features: FeatureVector, subscores: Subscores, language: ExplainabilityLanguage): string[] {
+    const tips: string[] = [];
+
+    if (subscores.motivation < 0.6) {
+        tips.push(language === 'eng'
+            ? 'Clarify long-term goals and tie them to this program with specific examples.'
+            : language === 'kz'
+                ? 'Ұзақ мерзімді мақсаттарды нақтылап, оларды осы бағдарламамен нақты мысалдар арқылы байланыстырыңыз.'
+                : 'Уточните долгосрочные цели и свяжите их с этой программой на конкретных примерах.');
+    }
+
+    if (subscores.leadership < 0.6) {
+        tips.push(language === 'eng'
+            ? 'Add concrete leadership or team coordination cases with measurable outcomes.'
+            : language === 'kz'
+                ? 'Өлшенетін нәтижелері бар көшбасшылық немесе команда үйлестіру тәжірибесін қосыңыз.'
+                : 'Добавьте конкретные примеры лидерства или координации команды с измеримым результатом.');
+    }
+
+    if (subscores.growth < 0.6) {
+        tips.push(language === 'eng'
+            ? 'Show stronger growth trajectory: what changed, why it changed, and measurable progress.'
+            : language === 'kz'
+                ? 'Өсу траекториясын күшейтіңіз: не өзгерді, неге өзгерді және өлшенетін ілгерілеу қандай.'
+                : 'Покажите более явную траекторию роста: что изменилось, почему и какой измеримый прогресс достигнут.');
+    }
+
+    if (subscores.readiness < 0.65) {
+        tips.push(language === 'eng'
+            ? 'Improve readiness by completing all profile fields and providing up-to-date contact details.'
+            : language === 'kz'
+                ? 'Дайындықты арттыру үшін профиль өрістерін толық толтырып, байланыс деректерін жаңартыңыз.'
+                : 'Повышайте готовность: заполните все поля профиля и обновите контактные данные.');
+    }
+
+    if (features.essayWordCount < 250) {
+        tips.push(language === 'eng'
+            ? 'Expand the essay with concrete impact stories to increase evidence quality.'
+            : language === 'kz'
+                ? 'Дәлел сапасын арттыру үшін эссені нақты әсер ету оқиғаларымен толықтырыңыз.'
+                : 'Расширьте эссе конкретными историями о влиянии, чтобы повысить качество доказательной базы.');
+    }
+
+    if (features.revisionsCount < 2) {
+        tips.push(language === 'eng'
+            ? 'Submit at least one more revision to demonstrate reflection and improvement.'
+            : language === 'kz'
+                ? 'Рефлексия мен жақсаруды көрсету үшін кемінде тағы бір нұсқа жіберіңіз.'
+                : 'Сделайте минимум еще одну итерацию эссе, чтобы показать рефлексию и улучшение.');
+    }
+
+    if (features.engagementSignals < 0.5) {
+        tips.push(language === 'eng'
+            ? 'Increase engagement signals by submitting updates earlier and maintaining completion momentum.'
+            : language === 'kz'
+                ? 'Жаңартуларды ертерек жіберіп, толықтыру қарқынын сақтап, қатысу сигналдарын күшейтіңіз.'
+                : 'Усилите сигналы вовлеченности: отправляйте обновления раньше и поддерживайте темп заполнения.');
+    }
+
+    if (!features.hasVideo) {
+        tips.push(language === 'eng'
+            ? 'If possible, add a short video to improve readiness and communication evidence.'
+            : language === 'kz'
+                ? 'Мүмкін болса, дайындық пен коммуникация дәлелін күшейту үшін қысқа видео қосыңыз.'
+                : 'Если возможно, добавьте короткое видео для усиления сигнала готовности и коммуникации.');
+    }
+
+    if (tips.length === 0) {
+        tips.push(language === 'eng'
+            ? 'Current profile is strong; focus on keeping essay evidence specific and outcomes measurable.'
+            : language === 'kz'
+                ? 'Ағымдағы профиль мықты; эсседегі дәлелдерді нақты және нәтижелерді өлшенетін етіп сақтаңыз.'
+                : 'Текущий профиль сильный; фокусируйтесь на конкретике в эссе и измеримых результатах.');
+    }
+
+    return [...new Set(tips)].slice(0, 5);
 }
 
 async function mapWithConcurrency<T, R>(
@@ -719,6 +901,63 @@ export function createScoringService(
                 results,
                 processed: results.length,
                 ...(input.cohortId ? { cohortId: input.cohortId } : {}),
+            };
+        },
+
+        async getExplanation(
+            candidateId: string,
+            requesterUserId: string,
+            isAdmin: boolean,
+            language?: ExplainabilityLanguage,
+        ): Promise<CandidateExplanationResult> {
+            if (!ObjectId.isValid(candidateId)) {
+                throw new ScoringServiceError('Invalid candidate id', 400, 'invalid_candidate_id');
+            }
+
+            const candidateObjectId = new ObjectId(candidateId);
+            const intake = await intakeCollection.findOne({ _id: candidateObjectId });
+            if (!intake) {
+                throw new ScoringServiceError('Candidate not found', 404, 'candidate_not_found');
+            }
+
+            if (!isAdmin && intake.userId !== requesterUserId) {
+                throw new ScoringServiceError('Forbidden', 403, 'forbidden');
+            }
+
+            const scoring = await scoringCollection
+                .find({ candidateId: candidateObjectId })
+                .sort({ updatedAt: -1 })
+                .limit(1)
+                .next();
+
+            if (!scoring) {
+                throw new ScoringServiceError('Scoring not found', 404, 'scoring_not_found');
+            }
+
+            const responseLanguage = normalizeExplanationLanguage(language);
+            const features = scoring.features && typeof scoring.features === 'object'
+                ? scoring.features
+                : engineerFeatures(intake, await getVersions(candidateObjectId));
+            const contributions = scoreContributionPercentages(scoring.subscores, scoring.track);
+            const confidencePercent = Number((clampScore(scoring.confidence) * 100).toFixed(2));
+
+            return {
+                candidateId,
+                reasons: {
+                    factorsPlus: topFactors(translateFactors(scoring.explanation.factorsPlus, responseLanguage), 5),
+                    factorsMinus: topFactors(translateFactors(scoring.explanation.factorsMinus, responseLanguage), 5),
+                },
+                subfactorContributions: contributions,
+                confidencePercent,
+                counterFactuals: buildCounterfactuals(features, scoring.subscores, responseLanguage),
+                requiresManualReview: scoring.confidence < 0.55,
+                modelLimitations: LIMITATIONS_TEXT[responseLanguage],
+                metadata: {
+                    track: scoring.track,
+                    scoringVersion: scoring.scoringVersion,
+                    scoredAt: (scoring.metadata?.scoredAt ?? scoring.updatedAt.toISOString()),
+                    language: responseLanguage,
+                },
             };
         },
     };

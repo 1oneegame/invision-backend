@@ -104,3 +104,33 @@ export type ListScoringResult = {
     processed: number;
     cohortId?: string;
 };
+
+export type ExplainabilityLanguage = 'ru' | 'eng' | 'kz';
+
+export type SubfactorContributions = {
+    motivationPercent: number;
+    leadershipPercent: number;
+    growthPercent: number;
+    readinessPercent: number;
+};
+
+export type ExplanationReasons = {
+    factorsPlus: string[];
+    factorsMinus: string[];
+};
+
+export type CandidateExplanationResult = {
+    candidateId: string;
+    reasons: ExplanationReasons;
+    subfactorContributions: SubfactorContributions;
+    confidencePercent: number;
+    counterFactuals: string[];
+    requiresManualReview: boolean;
+    modelLimitations: string;
+    metadata: {
+        track: Track;
+        scoringVersion: string;
+        scoredAt: string;
+        language: ExplainabilityLanguage;
+    };
+};

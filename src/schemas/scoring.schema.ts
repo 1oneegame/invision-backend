@@ -13,6 +13,12 @@ export const RecommendationSchema = Type.Union([
     Type.Literal('hold'),
 ]);
 
+export const ExplainabilityLanguageSchema = Type.Union([
+    Type.Literal('ru'),
+    Type.Literal('eng'),
+    Type.Literal('kz'),
+]);
+
 export const ScoringErrorSchema = Type.Object({
     message: Type.String(),
     code: Type.Optional(Type.String()),
@@ -105,6 +111,38 @@ export const ListScoringResponseSchema = Type.Object({
     cohortId: Type.Optional(Type.String({ minLength: 1 })),
 });
 
+export const CandidateExplanationQuerySchema = Type.Object({
+    language: Type.Optional(ExplainabilityLanguageSchema),
+});
+
+export const CandidateExplanationReasonsSchema = Type.Object({
+    factorsPlus: Type.Array(Type.String()),
+    factorsMinus: Type.Array(Type.String()),
+});
+
+export const CandidateExplanationContributionsSchema = Type.Object({
+    motivationPercent: Type.Number({ minimum: 0, maximum: 100 }),
+    leadershipPercent: Type.Number({ minimum: 0, maximum: 100 }),
+    growthPercent: Type.Number({ minimum: 0, maximum: 100 }),
+    readinessPercent: Type.Number({ minimum: 0, maximum: 100 }),
+});
+
+export const CandidateExplanationResponseSchema = Type.Object({
+    candidateId: Type.String({ minLength: 1 }),
+    reasons: CandidateExplanationReasonsSchema,
+    subfactorContributions: CandidateExplanationContributionsSchema,
+    confidencePercent: Type.Number({ minimum: 0, maximum: 100 }),
+    counterFactuals: Type.Array(Type.String()),
+    requiresManualReview: Type.Boolean(),
+    modelLimitations: Type.String({ minLength: 1 }),
+    metadata: Type.Object({
+        track: TrackSchema,
+        scoringVersion: Type.String({ minLength: 1 }),
+        scoredAt: Type.String({ format: 'date-time' }),
+        language: ExplainabilityLanguageSchema,
+    }),
+});
+
 export type Track = Static<typeof TrackSchema>;
 export type Recommendation = Static<typeof RecommendationSchema>;
 export type RunScoringBody = Static<typeof RunScoringBodySchema>;
@@ -113,3 +151,6 @@ export type BatchScoringBody = Static<typeof BatchScoringBodySchema>;
 export type BatchScoringResponse = Static<typeof BatchScoringResponseSchema>;
 export type ListScoringQuery = Static<typeof ListScoringQuerySchema>;
 export type ListScoringResponse = Static<typeof ListScoringResponseSchema>;
+export type ExplainabilityLanguage = Static<typeof ExplainabilityLanguageSchema>;
+export type CandidateExplanationQuery = Static<typeof CandidateExplanationQuerySchema>;
+export type CandidateExplanationResponse = Static<typeof CandidateExplanationResponseSchema>;

@@ -22,6 +22,10 @@ Backend now includes Stage 2 scoring endpoints (Admin only):
 - `POST /scoring/batch`
 - `GET /scoring/list`
 
+Candidate explainability endpoint is available under candidates routes:
+
+- `GET /candidates/:id/explanation`
+
 > Important: if AI enhancement is unavailable, scoring now returns an error (`503`, `code: "ai_unavailable"`) and does not fallback to baseline-only mode.
 
 ### `POST /scoring/run`
@@ -119,6 +123,49 @@ Response:
 	],
 	"processed": 1,
 	"cohortId": "cohort-2026"
+}
+```
+
+### `GET /candidates/:id/explanation`
+
+Returns explainability data for the latest saved scoring result of a candidate.
+
+Language support:
+
+- Query: `language=ru|eng|kz`
+- Default: `ru`
+
+Example query:
+
+```http
+GET /candidates/6801d0d8a9b2bde33c8f4562/explanation?language=eng
+```
+
+Response:
+
+```json
+{
+	"candidateId": "6801d0d8a9b2bde33c8f4562",
+	"reasons": {
+		"factorsPlus": ["..."],
+		"factorsMinus": ["..."]
+	},
+	"subfactorContributions": {
+		"motivationPercent": 28.44,
+		"leadershipPercent": 26.12,
+		"growthPercent": 23.17,
+		"readinessPercent": 22.27
+	},
+	"confidencePercent": 67.5,
+	"counterFactuals": ["...", "..."],
+	"requiresManualReview": false,
+	"modelLimitations": "This is an AI-assisted assessment, not an autonomous decision. Committee review remains mandatory, especially for borderline cases.",
+	"metadata": {
+		"track": "undergraduate",
+		"scoringVersion": "v1",
+		"scoredAt": "2026-04-02T12:00:00.000Z",
+		"language": "eng"
+	}
 }
 ```
 
