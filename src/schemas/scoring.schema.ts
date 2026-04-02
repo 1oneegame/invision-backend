@@ -81,9 +81,35 @@ export const BatchScoringResponseSchema = Type.Object({
     cohortId: Type.Optional(Type.String({ minLength: 1 })),
 });
 
+export const ListScoringQuerySchema = Type.Object({
+    cohortId: Type.Optional(Type.String({ minLength: 1 })),
+    track: Type.Optional(TrackSchema),
+    scoringVersion: Type.Optional(Type.String({ minLength: 1 })),
+    limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 500 })),
+});
+
+export const ListScoringItemSchema = Type.Object({
+    candidateId: Type.String({ minLength: 1 }),
+    score: Type.Number({ minimum: 0, maximum: 1 }),
+    rank: Type.Number({ minimum: 1 }),
+    recommendation: RecommendationSchema,
+    confidence: Type.Number({ minimum: 0, maximum: 1 }),
+    track: TrackSchema,
+    scoringVersion: Type.String({ minLength: 1 }),
+    scoredAt: Type.String({ format: 'date-time' }),
+});
+
+export const ListScoringResponseSchema = Type.Object({
+    results: Type.Array(ListScoringItemSchema),
+    processed: Type.Number({ minimum: 0 }),
+    cohortId: Type.Optional(Type.String({ minLength: 1 })),
+});
+
 export type Track = Static<typeof TrackSchema>;
 export type Recommendation = Static<typeof RecommendationSchema>;
 export type RunScoringBody = Static<typeof RunScoringBodySchema>;
 export type RunScoringResponse = Static<typeof RunScoringResponseSchema>;
 export type BatchScoringBody = Static<typeof BatchScoringBodySchema>;
 export type BatchScoringResponse = Static<typeof BatchScoringResponseSchema>;
+export type ListScoringQuery = Static<typeof ListScoringQuerySchema>;
+export type ListScoringResponse = Static<typeof ListScoringResponseSchema>;

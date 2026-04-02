@@ -9,6 +9,9 @@ import type {
     BatchScoringInput,
     BatchScoringResultItem,
     FeatureVector,
+    ListScoringInput,
+    ListScoringResult,
+    ListScoringResultItem,
     Recommendation,
     RunScoringInput,
     ScoringExplanation,
@@ -369,19 +372,14 @@ export function createScoringService(
         );
     }
 
-    function confidenceFromFeatures(features: FeatureVector, degradedMode: boolean): number {
+    function confidenceFromFeatures(features: FeatureVector): number {
         const baseConfidence = clampScore(
             (features.profileCompleteness * 0.35)
             + (features.essayRichness * 0.2)
             + (features.engagementSignals * 0.25)
             + (Math.min(features.essayWordCount, 400) / 400) * 0.2,
         );
-
-        if (!degradedMode) {
-            return baseConfidence;
-        }
-
-        return clampScore(baseConfidence * 0.85);
+        return baseConfidence;
     }
 
     async function runAiEnhancement(
@@ -433,30 +431,23 @@ export function createScoringService(
         const baseline = buildBaselineSubscores(features);
         const baselineExplanation = buildBaselineExplanation(features);
 
-        let degradedMode = false;
-        let usedAiEnhancement = false;
-        let aiAnalysis: AiEssayAnalysis | null = null;
-        let aiFailureReason: string | null = null;
+        let aiAnalysis: AiEssayAnalysis;
 
         try {
             aiAnalysis = await runAiEnhancement(intake, track, baseline, features);
-            usedAiEnhancement = true;
-        } catch (error) {
-            degradedMode = true;
-            aiFailureReason = error instanceof Error ? error.message : 'AI enhancement unavailable';
+        } catch {
+            throw new ScoringServiceError('AI is unavailable', 503, 'ai_unavailable');
         }
 
-        const subscores: Subscores = aiAnalysis
-            ? {
-                motivation: clampScore((baseline.motivation * (1 - config.aiInfluence)) + (aiAnalysis.motivation * config.aiInfluence)),
-                leadership: clampScore((baseline.leadership * (1 - config.aiInfluence)) + (aiAnalysis.leadership * config.aiInfluence)),
-                growth: clampScore((baseline.growth * (1 - config.aiInfluence)) + (aiAnalysis.growth * config.aiInfluence)),
-                readiness: clampScore((baseline.readiness * (1 - config.aiInfluence)) + (aiAnalysis.readiness * config.aiInfluence)),
-            }
-            : baseline;
+        const subscores: Subscores = {
+            motivation: clampScore((baseline.motivation * (1 - config.aiInfluence)) + (aiAnalysis.motivation * config.aiInfluence)),
+            leadership: clampScore((baseline.leadership * (1 - config.aiInfluence)) + (aiAnalysis.leadership * config.aiInfluence)),
+            growth: clampScore((baseline.growth * (1 - config.aiInfluence)) + (aiAnalysis.growth * config.aiInfluence)),
+            readiness: clampScore((baseline.readiness * (1 - config.aiInfluence)) + (aiAnalysis.readiness * config.aiInfluence)),
+        };
 
         const totalScore = weightedTotal(subscores, track);
-        const confidence = confidenceFromFeatures(features, degradedMode);
+        const confidence = confidenceFromFeatures(features);
         const recommendation = recommendationFromScore(totalScore, confidence);
 
         const explanation: ScoringExplanation = {
@@ -466,11 +457,9 @@ export function createScoringService(
             ]),
             factorsMinus: dedupeFactors([
                 ...baselineExplanation.factorsMinus,
-                ...(aiAnalysis?.factorsMinus ?? []),
+                ...aiAnalysis.factorsMinus,
             ]),
-            notes: aiAnalysis
-                ? aiAnalysis.notes
-                : `${baselineExplanation.notes} AI enhancement fallback used: ${aiFailureReason ?? 'unknown reason'}.`,
+            notes: aiAnalysis.notes,
         };
 
         const scoredAt = new Date();
@@ -487,8 +476,8 @@ export function createScoringService(
                 track,
                 scoringVersion: config.scoringVersion,
                 model: config.model,
-                usedAiEnhancement,
-                degradedMode,
+                usedAiEnhancement: true,
+                degradedMode: false,
                 scoredAt: scoredAt.toISOString(),
             },
         };
@@ -660,6 +649,76 @@ export function createScoringService(
                 processed: results.length,
                 ...(failures.length > 0 ? { failures } : {}),
                 ...(hasCohortId ? { cohortId: input.cohortId } : {}),
+            };
+        },
+
+        async list(input: ListScoringInput): Promise<ListScoringResult> {
+            const limit = Math.min(500, Math.max(1, input.limit ?? 100));
+            const filter: {
+                track?: Track;
+                scoringVersion?: string;
+                candidateId?: { $in: ObjectId[] };
+            } = {};
+
+            if (input.track) {
+                filter.track = input.track;
+            }
+
+            if (input.scoringVersion) {
+                filter.scoringVersion = input.scoringVersion;
+            }
+
+            if (input.cohortId) {
+                const cohort = await cohortsCollection.findOne({ cohortId: input.cohortId });
+
+                let cohortCandidateIds = cohort?.candidateIds ?? [];
+                if (cohortCandidateIds.length === 0) {
+                    const fallbackIds = await intakeCollection
+                        .find({ cohortId: input.cohortId })
+                        .project({ _id: 1 })
+                        .toArray();
+
+                    cohortCandidateIds = fallbackIds
+                        .map((item) => item._id?.toHexString())
+                        .filter((id): id is string => Boolean(id));
+                }
+
+                const objectIds = cohortCandidateIds
+                    .filter((id) => ObjectId.isValid(id))
+                    .map((id) => new ObjectId(id));
+
+                if (objectIds.length === 0) {
+                    return {
+                        results: [],
+                        processed: 0,
+                        cohortId: input.cohortId,
+                    };
+                }
+
+                filter.candidateId = { $in: objectIds };
+            }
+
+            const docs = await scoringCollection
+                .find(filter)
+                .sort({ totalScore: -1, confidence: -1, updatedAt: -1 })
+                .limit(limit)
+                .toArray();
+
+            const results: ListScoringResultItem[] = docs.map((item, index) => ({
+                candidateId: item.candidateId.toHexString(),
+                score: item.totalScore,
+                rank: index + 1,
+                recommendation: item.recommendation,
+                confidence: item.confidence,
+                track: item.track,
+                scoringVersion: item.scoringVersion,
+                scoredAt: item.updatedAt.toISOString(),
+            }));
+
+            return {
+                results,
+                processed: results.length,
+                ...(input.cohortId ? { cohortId: input.cohortId } : {}),
             };
         },
     };

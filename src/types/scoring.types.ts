@@ -80,3 +80,27 @@ export type BatchScoringInput = {
     cohortId?: string;
     track?: Track;
 };
+
+export type ListScoringInput = {
+    cohortId?: string;
+    track?: Track;
+    scoringVersion?: string;
+    limit?: number;
+};
+
+export type ListScoringResultItem = {
+    candidateId: string;
+    score: number;
+    rank: number;
+    recommendation: Recommendation;
+    confidence: number;
+    track: Track;
+    scoringVersion: string;
+    scoredAt: string;
+};
+
+export type ListScoringResult = {
+    results: ListScoringResultItem[];
+    processed: number;
+    cohortId?: string;
+};

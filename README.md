@@ -20,6 +20,9 @@ Backend now includes Stage 2 scoring endpoints (Admin only):
 
 - `POST /scoring/run`
 - `POST /scoring/batch`
+- `GET /scoring/list`
+
+> Important: if AI enhancement is unavailable, scoring now returns an error (`503`, `code: "ai_unavailable"`) and does not fallback to baseline-only mode.
 
 ### `POST /scoring/run`
 
@@ -85,6 +88,37 @@ Response:
 		}
 	],
 	"processed": 2
+}
+```
+
+### `GET /scoring/list`
+
+Returns already-calculated scoring results sorted by score (desc), confidence (desc), and scoring time (desc).
+
+Example query:
+
+```http
+GET /scoring/list?cohortId=cohort-2026&track=undergraduate&scoringVersion=v1&limit=100
+```
+
+Response:
+
+```json
+{
+	"results": [
+		{
+			"candidateId": "6801d0d8a9b2bde33c8f4562",
+			"score": 0.82,
+			"rank": 1,
+			"recommendation": "strong shortlist",
+			"confidence": 0.71,
+			"track": "undergraduate",
+			"scoringVersion": "v1",
+			"scoredAt": "2026-04-02T12:00:00.000Z"
+		}
+	],
+	"processed": 1,
+	"cohortId": "cohort-2026"
 }
 ```
 

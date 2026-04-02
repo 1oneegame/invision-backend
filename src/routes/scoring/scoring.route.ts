@@ -2,11 +2,13 @@ import type { FastifyPluginAsync } from 'fastify';
 import {
     BatchScoringBodySchema,
     BatchScoringResponseSchema,
+    ListScoringQuerySchema,
+    ListScoringResponseSchema,
     RunScoringBodySchema,
     RunScoringResponseSchema,
     ScoringErrorSchema,
 } from '../../schemas/scoring.schema.js';
-import type { BatchScoringBody, RunScoringBody } from '../../schemas/scoring.schema.js';
+import type { BatchScoringBody, ListScoringQuery, RunScoringBody } from '../../schemas/scoring.schema.js';
 import {
     createScoringService,
     ScoringServiceError,
@@ -133,6 +135,38 @@ const scoringRoutes: FastifyPluginAsync = async (fastify) => {
             }
 
             request.log.error({ error }, 'Scoring batch failed');
+            return reply.code(500).send({ message: 'Internal server error' });
+        }
+    });
+
+    fastify.get<{ Querystring: ListScoringQuery }>('/list', {
+        preHandler: fastify.authorizeRoles(['Admin']),
+        schema: {
+            querystring: ListScoringQuerySchema,
+            response: {
+                200: ListScoringResponseSchema,
+                400: ScoringErrorSchema,
+                401: ScoringErrorSchema,
+                403: ScoringErrorSchema,
+                500: ScoringErrorSchema,
+            },
+        },
+    }, async (request, reply) => {
+        try {
+            const result = await scoringService.list({
+                ...(request.query.cohortId ? { cohortId: request.query.cohortId } : {}),
+                ...(request.query.track ? { track: request.query.track } : {}),
+                ...(request.query.scoringVersion ? { scoringVersion: request.query.scoringVersion } : {}),
+                ...(request.query.limit ? { limit: request.query.limit } : {}),
+            });
+
+            return reply.code(200).send(result);
+        } catch (error) {
+            if (error instanceof ScoringServiceError) {
+                return reply.code(error.statusCode).send({ message: error.message, code: error.code });
+            }
+
+            request.log.error({ error }, 'Scoring list failed');
             return reply.code(500).send({ message: 'Internal server error' });
         }
     });
