@@ -22,7 +22,7 @@ export const SignupBodySchema = Type.Object({
     name: Type.String({ minLength: 1, maxLength: 120 }),
     surname: Type.String({ minLength: 1, maxLength: 120 }),
     email: Type.String({ format: 'email', maxLength: 320 }),
-    phone: Type.String({ minLength: 7, maxLength: 20, pattern: '^\\+?[0-9]{7,20}$' }),
+    phone: Type.String({ minLength: 7, maxLength: 25, pattern: '^\\+?[\\d\\s\\-().]{7,25}$' }),
     password: Type.String({ minLength: 8, maxLength: 72 }),
     role: Type.Optional(UserRoleSchema),
 });

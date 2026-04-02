@@ -19,8 +19,9 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
     await usersCollection.createIndex({ email: 1 }, { unique: true });
 
+    const jwtExpiresIn = process.env.JWT_EXPIRES_IN ?? '1h';
     const authService = createAuthService(usersCollection, (payload) =>
-        fastify.jwt.sign(payload, { expiresIn: '1h' }),
+        fastify.jwt.sign(payload, { expiresIn: jwtExpiresIn }),
     );
 
     fastify.post<{ Body: SignupBody }>('/signup', {

@@ -63,7 +63,7 @@ function normalizeEmail(email: string): string {
 }
 
 function normalizePhone(phone: string): string {
-    return phone.trim();
+    return phone.trim().replace(/[\s\-().]/g, '');
 }
 
 function toAuthUserDto(user: AuthUserDocument & { _id: ObjectId }): AuthUserDto {

@@ -33,7 +33,7 @@ function normalizeBody(body: IntakeBody): IntakeBody {
     const profile = {
         ...body.profile,
         email: body.profile.email.trim().toLowerCase(),
-        phone: body.profile.phone.trim(),
+        phone: body.profile.phone.trim().replace(/[\s\-().]/g, ''),
         firstName: body.profile.firstName.trim(),
         lastName: body.profile.lastName.trim(),
     };

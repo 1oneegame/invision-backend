@@ -9,7 +9,7 @@ export const IntakeProfileSchema = Type.Object({
     firstName: Type.String({ minLength: 1, maxLength: 120 }),
     lastName: Type.String({ minLength: 1, maxLength: 120 }),
     email: Type.String({ format: 'email', maxLength: 320 }),
-    phone: Type.String({ minLength: 7, maxLength: 20, pattern: '^\\+?[0-9]{7,20}$' }),
+    phone: Type.String({ minLength: 7, maxLength: 25, pattern: '^\\+?[\\d\\s\\-().]{7,25}$' }),
     dateOfBirth: Type.Optional(Type.String({ format: 'date' })),
     country: Type.Optional(Type.String({ minLength: 2, maxLength: 100 })),
     language: Type.Optional(Type.String({ minLength: 2, maxLength: 50 })),
